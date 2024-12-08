@@ -14,49 +14,55 @@
 
 DHTesp dht;
 Servo servoMotor;
-BlynkTimer timer;
 
 bool fanState = false;
 int fanSpeed = 10; 
 int currentAngle = 0; 
-bool rotatingForward = true; 
+bool rotatingForward = true;
 
-void readDHT() {
-  float temperature = dht.getTemperature();
-  float humidity = dht.getHumidity();
+void readDHT(void *pvParameters) {
+  while (true) {
+    float temperature = dht.getTemperature();
+    float humidity = dht.getHumidity();
 
-  if (isnan(temperature) || isnan(humidity)) {
-    Serial.println("Gagal membaca data dari DHT22!");
-    return;
-  }
+    if (isnan(temperature) || isnan(humidity)) {
+      Serial.println("Gagal membaca data dari DHT22!");
+    } else {
+      Serial.printf("Suhu: %.1f°C, Kelembapan: %.1f%%\n", temperature, humidity);
+      Blynk.virtualWrite(V3, temperature);
+      Blynk.virtualWrite(V4, humidity);
 
-  Serial.printf("Suhu: %.1f°C, Kelembapan: %.1f%%\n", temperature, humidity);
-  Blynk.virtualWrite(V3, temperature);
-  Blynk.virtualWrite(V4, humidity);
+      if (temperature >= 30.0) {
+        fanState = true;
+      } else {
+        fanState = false;
+      }
+    }
 
-  if (temperature >= 30.0) {
-    fanState = true;
-  } else {
-    fanState = false;
+    vTaskDelay(1000 / portTICK_PERIOD_MS);  
   }
 }
 
-void rotateFan() {
-  if (fanState) {
-    if (rotatingForward) {
-      currentAngle += 1;
-      if (currentAngle >= 180) {
-        rotatingForward = false;
+void rotateFan(void *pvParameters) {
+  while (true) {
+    if (fanState) {
+      if (rotatingForward) {
+        currentAngle += 1;
+        if (currentAngle >= 180) {
+          rotatingForward = false;
+        }
+      } else {
+        currentAngle -= 1;
+        if (currentAngle <= 0) {
+          rotatingForward = true;
+        }
       }
+      servoMotor.write(currentAngle);
     } else {
-      currentAngle -= 1;
-      if (currentAngle <= 0) {
-        rotatingForward = true;
-      }
+      servoMotor.write(0);
     }
-    servoMotor.write(currentAngle);
-  } else {
-    servoMotor.write(0);
+
+    vTaskDelay(10 / portTICK_PERIOD_MS); 
   }
 }
 
@@ -73,7 +79,7 @@ void setup() {
 
   Serial.print("\nConnecting to Blynk");
   Blynk.begin(BLYNK_AUTH_TOKEN, "Wokwi-GUEST", "");
-  while (!Blynk.connected()){
+  while (!Blynk.connected()) {
     delay(100);
     Serial.print(".");
   }
@@ -82,8 +88,8 @@ void setup() {
   dht.setup(DHT_PIN, DHTesp::DHT22);
   servoMotor.attach(SERVO_PIN);
 
-  timer.setInterval(1000L, readDHT);
-  timer.setInterval(10L, rotateFan);
+  xTaskCreate(readDHT, "ReadDHT", 4096, NULL, 1, NULL);
+  xTaskCreate(rotateFan, "RotateFan", 2048, NULL, 1, NULL);
 
   Serial.println("\n----------------");
   Serial.println("|Pet Smart Home|");
@@ -92,5 +98,4 @@ void setup() {
 
 void loop() {
   Blynk.run();
-  timer.run();
 }
