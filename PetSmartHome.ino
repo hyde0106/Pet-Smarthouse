@@ -6,6 +6,10 @@
 #include <BlynkSimpleEsp32.h>
 #include <DHTesp.h>
 #include <ESP32Servo.h>
+#include <BLEDevice.h>
+#include <BLEScan.h>
+#include <BLEAdvertisedDevice.h>
+
 
 #define PHOTORESISTOR_PIN 32
 #define LED_PIN 12
@@ -14,11 +18,44 @@
 
 DHTesp dht;
 Servo servoMotor;
+BLEScan* pBLEScan;
+const char* targetName = "My Pet"; 
+unsigned long lastSeenTime = 0; 
+const unsigned long WARNING_INTERVAL = 300; // 5 menit dalam detik
 
 bool fanState = false;
 int fanSpeed = 10; 
 int currentAngle = 0; 
 bool rotatingForward = true;
+
+//define class buat callback advertise
+class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
+  void onResult(BLEAdvertisedDevice advertisedDevice) {
+    // memeriksa sama dengan targetName
+    if (advertisedDevice.getName() == targetName) {
+      unsigned long currentTime = millis() / 1000; //mendapat waktu sekarang dalam ms
+      lastSeenTime = currentTime; // update lastseen
+
+      Serial.print("Found Pet: ");
+      Serial.println(advertisedDevice.toString().c_str());
+    }
+  }
+};
+
+//Task buat scanning BLE
+void bleScanTask(void* parameter) {
+  while (true) {
+    pBLEScan->start(5, false); // Scan ble selama 5 detik
+
+    // cek apakah pet tidak ditemukan dalam 5 menit terakhir
+    unsigned long currentTime = millis() / 1000; // mendapat waktu sekarang dalam ms
+    if ((currentTime - lastSeenTime) > WARNING_INTERVAL) {
+      Serial.println("WARNING: Pet hanst been found in the last 5 minutes!");
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(5000)); 
+  }
+}
 
 void readDHT(void *pvParameters) {
   while (true) {
@@ -88,8 +125,14 @@ void setup() {
   dht.setup(DHT_PIN, DHTesp::DHT22);
   servoMotor.attach(SERVO_PIN);
 
+  BLEDevice::init("");
+  pBLEScan = BLEDevice::getScan();
+  pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
+  pBLEScan->setActiveScan(true);
+
   xTaskCreate(readDHT, "ReadDHT", 4096, NULL, 1, NULL);
   xTaskCreate(rotateFan, "RotateFan", 2048, NULL, 1, NULL);
+  xTaskCreate(bleScanTask, "BLE Scan Task", 4096, NULL, 1, NULL);
 
   Serial.println("\n----------------");
   Serial.println("|Pet Smart Home|");
