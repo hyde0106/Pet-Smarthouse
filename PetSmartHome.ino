@@ -140,7 +140,7 @@ void checkFeedingTime() {
   if (currentHour == 8 || currentHour == 18) { // Contoh jadwal makan
     if (!isFeedingTime) {
       isFeedingTime = true;
-      Blynk.notify("Waktunya memberi makan hewan!");
+      // Blynk.notify("Waktunya memberi makan hewan!");
       Serial.println("Notifikasi: Waktunya memberi makan hewan!");
     }
   } else {
