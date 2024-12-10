@@ -1,13 +1,13 @@
 # Pet Smart Home
 ## Introduction to the Problem and the Solution
 
-Dalam era modern yang serba cepat, banyak pemilik hewan peliharaan menghadapi tantangan dalam merawat hewan kesayangan mereka. Kesibukan sehari-hari membuat sulit untuk menjaga jadwal makan, memantau kondisi lingkungan, serta memastikan keamanan hewan peliharaan. Masalah ini dapat berdampak pada kesehatan dan kesejahteraan hewan.
+Dalam era modern yang serba cepat, banyak pemilik hewan peliharaan menghadapi tantangan dalam merawat hewan kesayangan mereka. Kesibukan sehari-hari membuat pemilik hewan kesulitan untuk mengecek jadwal makan, memantau kondisi lingkungan, serta memastikan keamanan hewan peliharaan. Masalah ini dapat berdampak pada kesehatan dan kesejahteraan hewan.
 
-**Pet Smart Home** hadir sebagai solusi berbasis IoT untuk mempermudah perawatan hewan peliharaan. Sistem ini mengintegrasikan berbagai teknologi pintar untuk otomatisasi jadwal makan, pengontrolan pencahayaan, pemantauan suhu kandang, dan pelacakan lokasi hewan. Sistem ini dirancang agar dapat dioperasikan secara mudah melalui aplikasi **Blynk**, memungkinkan kontrol jarak jauh, pemberitahuan real-time, serta pemantauan kondisi lingkungan hewan.
+**Pet Smart Home** hadir sebagai solusi berbasis IoT untuk mempermudah perawatan hewan peliharaan. Sistem ini mengintegrasikan berbagai teknologi pintar untuk otomatisasi jadwal makan, pengontrolan pencahayaan, pemantauan suhu kandang, dan pelacakan lokasi hewan. Sistem ini dirancang agar dapat dioperasikan secara mudah melalui aplikasi **Blynk**, yang memungkinkan kontrol jarak jauh, pemberitahuan real-time, serta pemantauan kondisi lingkungan hewan.
 
 ## Hardware Design and Implementation Details
 
-Desain hardware Pet Smart Home bertujuan untuk mendukung semua fitur utama dengan komponen elektronik berikut:
+Desain hardware Pet Smart Home bertujuan untuk mendukung semua fitur utama dengan komponen elektronik berikut ini. 
 
 1. **ESP32**  
    Mikrokontroler utama dengan konektivitas Wi-Fi dan BLE untuk mengintegrasikan fitur perangkat keras dengan aplikasi Blynk.
@@ -16,7 +16,7 @@ Desain hardware Pet Smart Home bertujuan untuk mendukung semua fitur utama denga
    Digunakan untuk memantau suhu dan kelembapan kandang hewan. Data dari sensor ini mengontrol kipas secara otomatis untuk menjaga kenyamanan suhu kandang.
 
 3. **Servo Motor**  
-   Mengoperasikan mekanisme pemberian makan otomatis dengan menggerakkan tempat makan saat jadwal makan tiba.
+   Mengoperasikan mekanisme hidup/mati kipas secara otomatis dengan menggerakkan servo ketika suhu lingkungan sudah di atas 30°C.
 
 4. **Photoresistor**  
    Mendeteksi tingkat pencahayaan di kandang dan mengontrol LED untuk pencahayaan otomatis atau manual melalui aplikasi.
@@ -29,6 +29,9 @@ Desain hardware Pet Smart Home bertujuan untuk mendukung semua fitur utama denga
 
 7. **Buzzer**  
    Digunakan sebagai peringatan tambahan saat hewan tidak terdeteksi dalam radius tertentu selama periode waktu tertentu.
+
+Berikut ini skematik dari rangkaian hardware-nya.
+![Wokwi Schematic](https://github.com/user-attachments/assets/10bb1063-3a1a-444a-9531-ed18953e3e1a)
 
 ## Software Implementation Details
 
