@@ -1,221 +1,217 @@
-#define BLYNK_TEMPLATE_ID "TMPL6eoylgD75"
-#define BLYNK_TEMPLATE_NAME "LED"
-#define BLYNK_AUTH_TOKEN "MSUyjFk_K4mH34NTpq5t7DwFfOmdbdY7"
+#define BLYNK_TEMPLATE_ID "TMPL6eoylgD75"                    // ID template Blynk
+#define BLYNK_TEMPLATE_NAME "PetSmartHome"                   // Nama template Blynk
+#define BLYNK_AUTH_TOKEN "MSUyjFk_K4mH34NTpq5t7DwFfOmdbdY7"  // Token autentikasi Blynk
 
+// Library yang digunakan
 #include <WiFi.h>
 #include <BlynkSimpleEsp32.h>
 #include <DHTesp.h>
 #include <ESP32Servo.h>
-//#include <BLEDevice.h>
-//#include <BLEScan.h>
-//#include <BLEAdvertisedDevice.h>
 #include <TimeLib.h>
 #include <WidgetRTC.h>
 
-#define PHOTORESISTOR_PIN 32
-#define LED_PIN 15
-#define DHT_PIN 35
-#define SERVO_PIN 22
-#define FEED_BUTTON_PIN V2      // Tombol di Blynk
-#define FEED_NOTIFICATION_PIN V5 // Virtual pin untuk notifikasi
-#define RINGBUF_TYPE_NOSPLIT 0 // Gantikan enum dengan nilai default
+// Defini pin digital dan virtual
+#define PHOTORESISTOR_PIN 32      // Pin untuk sensor photoresistor
+#define LED_PIN 13                // Pin untuk LED
+#define DHT_PIN 23                // Pin untuk sensor DHT11
+#define SERVO_PIN 22              // Pin untuk motor servo
+#define FEED_BUTTON_PIN V2        // Virtual pin untuk tombol feed di Blynk
+#define FEED_NOTIFICATION_PIN V5  // Virtual pin untuk notifikasi beri makan
 
+// Variabel global untuk perangkat
+DHTesp dht;                                  // Objek untuk sensor DHT
+Servo servoMotor;                            // Objek untuk servo motor
+const char *targetName = "My Pet";           // Nama hewan yang dipantau
+unsigned long lastSeenTime = 0;              // Waktu terakhir hewan terlihat
+const unsigned long WARNING_INTERVAL = 300;  // Interval peringatan (5 menit)
 
-DHTesp dht;
-Servo servoMotor;
-//BLEScan *pBLEScan;
-const char *targetName = "My Pet";
-unsigned long lastSeenTime = 0;
-const unsigned long WARNING_INTERVAL = 300; // 5 menit dalam detik
-typedef int ringbuf_type_t; // Tambahkan ini jika tidak ditemukan definisi.
+// Variabel untuk fitur lampu
+bool lampStatus = false;  // Status ON/OFF lampu
+int brightness = 0;       // Intensitas cahaya (0-5)
 
-char auth[] = BLYNK_AUTH_TOKEN;
-char ssid[] = "Wokwi-GUEST";
-char pass[] = "";
-
-bool lampStatus = false;         // Status ON/OFF lampu
-int brightness = 0;              // Intensitas cahaya (0-5)
-
-bool fanState = false;
-int fanSpeed = 10;
-int currentAngle = 0;
-bool rotatingForward = true;
+// Variabel untuk fitur kipas
+bool fanState = false;        // Status ON/OFF kipas
+int fanSpeed = 10;            // Kecepatan kipas
+int currentAngle = 0;         // Sudut saat ini untuk servo motor
+bool rotatingForward = true;  // Arah putaran servo motor
 
 // Variabel untuk fitur makan
-int feedButtonPressCount = 0; // Jumlah tekanan tombol
-bool isFeedingTime = false;   // Status waktu makan
-bool lastButtonState = false; // Status tombol sebelumnya
+int feedButtonPressCount = 0;  // Jumlah tekanan tombol
+bool isFeedingTime = false;    // Status waktu makan
+bool lastButtonState = false;  // Status tombol sebelumnya
 
+WidgetRTC rtc;  // RTC untuk waktu makan
 
-// RTC untuk waktu makan
-WidgetRTC rtc;
-
+// Fungsi untuk memperbarui status lampu berdasarkan sensor cahaya
 void updateLampStatus() {
-  int ldrValue = analogRead(PHOTORESISTOR_PIN); // Baca nilai dari photoresistor
-  int lightValue = map(ldrValue, 0, 4095, 255, 0); // Konversi ke rentang 0-255
+  int ldrValue = analogRead(PHOTORESISTOR_PIN);     // Baca nilai dari sensor photoresistor
+  int lightValue = map(ldrValue, 0, 4095, 255, 0);  // Konversi ke rentang 0-255
 
-  // Jika lampStatus ON, gunakan nilai dari photoresistor
-  if (lampStatus) {
-    analogWrite(LED_PIN, lightValue); // Atur intensitas LED sesuai cahaya ruangan
+  if (lampStatus) {                    // Jika lampu diaktifkan
+    analogWrite(LED_PIN, lightValue);  // Atur intensitas LED sesuai cahaya ruangan
     Serial.printf("Lamp ON - LDR Value: %d, LED Intensity: %d\n", ldrValue, lightValue);
   } else {
-    analogWrite(LED_PIN, 0); // Matikan LED jika lampStatus OFF
+    analogWrite(LED_PIN, 0);  // Matikan LED
     Serial.println("Lamp OFF");
   }
 
-  // Perbarui status di Blynk
+  // Perbarui status ke aplikasi Blynk
   Blynk.virtualWrite(V0, lampStatus ? "ON" : "OFF");
   Blynk.virtualWrite(V1, brightness);
 }
 
-// Task untuk membaca data dari DHT22
+// Task untuk membaca data dari sensor DHT11
 void readDHT(void *pvParameters) {
+  servoMotor.attach(SERVO_PIN);  // Inisialisasi servo motor
+  servoMotor.write(0);           // Posisi awal kipas (mati)
+
   while (true) {
-    float temperature = dht.getTemperature();
-    float humidity = dht.getHumidity();
+    float temperature = dht.getTemperature();  // Variabel untuk menyimpan nilai suhu
+    float humidity = dht.getHumidity();        // Variabel untuk menyimpan nilai kelembaban
 
-    if (isnan(temperature) || isnan(humidity)) {
-      Serial.println("Gagal membaca data dari DHT22!");
-    } else {
+    if (isnan(temperature) || isnan(humidity)) {  // Periksa jika pembacaan gagal
+      Serial.println("Gagal membaca data dari DHT11!");
+    } else {  // Jika pembacaan berhasil, simpan nilai ke Blynk
       Serial.printf("Suhu: %.1f°C, Kelembapan: %.1f%%\n", temperature, humidity);
-      Blynk.virtualWrite(V3, temperature);
-      Blynk.virtualWrite(V4, humidity);
+      Blynk.virtualWrite(V3, temperature);  // Nilai suhu yang ditampilkan ke Blynk
+      Blynk.virtualWrite(V4, humidity);     // Nilai kelembaban yang ditampilkan ke Blynk
 
+      // Atur hidup/mati kipas berdasarkan suhu
       if (temperature >= 30.0) {
-        fanState = true;
+        if (!fanState) {
+          fanState = true;
+          servoMotor.write(90);  // Aktifkan kipas
+          Serial.println("Kipas menyala!");
+        }
       } else {
-        fanState = false;
+        if (fanState) {
+          fanState = false;
+          servoMotor.write(0);  // Matikan kipas
+          Serial.println("Kipas mati.");
+        }
       }
     }
 
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);  // Tunda 1 detik
   }
 }
 
-// Task untuk memutar kipas
+// Task untuk mengontrol putaran kipas
 void rotateFan(void *pvParameters) {
   while (true) {
-    if (fanState) {
+    if (fanState) {  // Jika kipas aktif
       if (rotatingForward) {
-        currentAngle += 1;
+        currentAngle += 1;  // Putar maju
         if (currentAngle >= 180) {
           rotatingForward = false;
         }
       } else {
-        currentAngle -= 1;
+        currentAngle -= 1;  // Putar mundur
         if (currentAngle <= 0) {
           rotatingForward = true;
         }
       }
-      servoMotor.write(currentAngle);
+      servoMotor.write(currentAngle);  // Simpan nilai sudut ke servo motor
     } else {
-      servoMotor.write(0);
+      servoMotor.write(0);  // Posisi awal jika kipas mati
     }
 
-    vTaskDelay(10 / portTICK_PERIOD_MS);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);  // Tunda 1 detik
   }
 }
 
+// Terima status lampu yang dikirim pengguna melalui Blynk
 BLYNK_WRITE(V0) {
   lampStatus = param.asInt();
   updateLampStatus();
 }
 
+// Terima intensitas lampu yang dikirim pengguna melalui Blynk
 BLYNK_WRITE(V1) {
   brightness = param.asInt();
   updateLampStatus();
 }
 
-// Fungsi untuk memproses tekanan tombol
-  BLYNK_WRITE(V2) {
-  bool buttonState = param.asInt(); // Membaca status tombol (1 = ditekan, 0 = dilepas)
-  
-  // Deteksi perubahan status tombol (dari 0 ke 1)
-  if (buttonState == true && lastButtonState == false) { 
-    if (isFeedingTime) { // Jika ini waktu makan
-      if (feedButtonPressCount < 5) { // Masih dalam batas pencetan
-        feedButtonPressCount++; // Tambah jumlah pencetan
+// Fungsi untuk memproses banyakan tekanan ke tombol makan
+BLYNK_WRITE(V2) {
+  bool buttonState = param.asInt();  // Membaca status tombol
+
+  if (buttonState == true && lastButtonState == false) {  // Deteksi perubahan status tombol
+    if (isFeedingTime) {                                  // Jika sudah waktu makan
+      if (feedButtonPressCount < 5) {                     // Cek batas banyaknya tekanan
+        feedButtonPressCount++;                           // Tambah jumlah tekanan tombol
         Serial.printf("Tombol Feeder ditekan: %d kali\n", feedButtonPressCount);
-
-        // Gerakkan servo untuk memberi makan
-        servoMotor.write(90); // Gerakkan servo ke 90 derajat
-        delay(2000);
-        servoMotor.write(0); // Kembalikan servo ke 0 derajat
-
-        // Notifikasi melalui Blynk
         int sisaPencetan = 5 - feedButtonPressCount;
         Blynk.virtualWrite(FEED_NOTIFICATION_PIN, String("Makanan diberikan! Sisa pencetan: ") + sisaPencetan);
-      } else { // Jika mencapai batas pencetan
+      } else {  // Jika mencapai batas pencetan
         Serial.println("Makanan sudah diberikan 5 kali. Tidak dapat memberi makan lagi!");
         Blynk.virtualWrite(FEED_NOTIFICATION_PIN, "Makanan sudah diberikan 5 kali. Tidak dapat memberi makan lagi!");
       }
-    } else { // Jika di luar waktu makan
+    } else {  // Jika belum waktu makan
       Serial.println("Tidak dalam waktu makan. Tombol ditekan di luar waktu makan.");
       Blynk.virtualWrite(FEED_NOTIFICATION_PIN, "Tidak dalam waktu makan. Tunggu jadwal makan berikutnya!");
     }
   }
-  // Simpan status tombol untuk iterasi berikutnya
-  lastButtonState = buttonState;
+  lastButtonState = buttonState;  // Simpan status tombol untuk iterasi berikutnya
 }
 
-
-// Fungsi untuk mengatur waktu makan
+// Fungsi untuk mengecek waktu makan
 void checkFeedingTime() {
-  int currentHour = hour(); // Mengambil waktu jam dari RTC Blynk
+  int currentHour = hour();  // Dapatkan jam saat ini dari RTC
 
-  if (currentHour == 8 || currentHour == 18) { // Contoh jadwal makan
-    if (!isFeedingTime) {
+  if (currentHour == 8 || currentHour == 12) {  // Contoh jadwal makan
+    if (!isFeedingTime) {                       // Jika sudah waktu makan
       isFeedingTime = true;
       feedButtonPressCount = 0;
       Serial.println("Notifikasi: Waktunya memberi makan hewan!");
     }
   } else {
-    if (isFeedingTime){
-    isFeedingTime = false;
-    feedButtonPressCount = 0; // Reset hitungan tombol di luar waktu makan
-    Serial.println("Notifikasi: Di luar waktu makan, hitungan tombol direset.");
+    if (isFeedingTime) {  // Jika belum waktu makan
+      isFeedingTime = false;
+      feedButtonPressCount = 0;  // Reset hitungan tombol di luar waktu makan
+      Serial.println("Notifikasi: Di luar waktu makan, hitungan tombol direset.");
     }
   }
 }
 
+// Callback untuk Blynk saat terkoneksi
 BLYNK_CONNECTED() {
-  Blynk.syncAll(); // Sinkronisasi semua virtual pin, termasuk RTC
+  Blynk.syncAll();  // Sinkronisasi semua virtual pin, termasuk RTC
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(115200);  // Mulai serial monitor
 
+  // Mulai koneksi dengan WiFi
   Serial.print("\nConnecting to WiFi");
-  WiFi.begin("Wokwi-GUEST", "", 6);
-  while (WiFi.status() != WL_CONNECTED) {
+  WiFi.begin("Ini WiFi", "IniPassword", 6);
+  while (WiFi.status() != WL_CONNECTED) {  // Cek status koneksi WiFi
     delay(100);
     Serial.print(".");
   }
   Serial.println("\nConnected to WiFi!");
 
+  // Mulai koneksi dengan Blynk
   Serial.print("\nConnecting to Blynk");
-  Blynk.begin(BLYNK_AUTH_TOKEN, "Wokwi-GUEST", "");
-  while (!Blynk.connected()) {
+  Blynk.begin(BLYNK_AUTH_TOKEN, "Ini WiFi", "IniPassword");
+  while (!Blynk.connected()) {  // Cek status koneksi Blynk
     delay(100);
     Serial.print(".");
   }
   Serial.println("\nConnected to Blynk!");
 
-  dht.setup(DHT_PIN, DHTesp::DHT22);
-  servoMotor.attach(SERVO_PIN);
-  pinMode(LED_PIN, OUTPUT);
-  analogWrite(LED_PIN, 0);
+  dht.setup(DHT_PIN, DHTesp::DHT11);  // Inisialisasi sensor DHT
+  servoMotor.attach(SERVO_PIN);       // Inisialisasi servo motor
+  pinMode(LED_PIN, OUTPUT);           // Atur pin LED sebagai output
+  analogWrite(LED_PIN, 0);            // Mulai LED dalam keadaan mati
   Serial.println("LED initialized!");
-
-  //timer.setInterval(1000L, checkFeedingTime); //cek waktu makan setiap detik
 
   updateLampStatus();
 
-  rtc.begin(); // Inisialisasi RTC
+  rtc.begin();  // Inisialisasi RTC
 
-  xTaskCreate(readDHT, "ReadDHT", 4096, NULL, 1, NULL);
-  xTaskCreate(rotateFan, "RotateFan", 2048, NULL, 1, NULL);
-  //xTaskCreate(bleScanTask, "BLE Scan Task", 4096, NULL, 1, NULL);
+  xTaskCreate(readDHT, "ReadDHT", 4096, NULL, 1, NULL);      // Task untuk membaca DHT
+  xTaskCreate(rotateFan, "RotateFan", 2048, NULL, 1, NULL);  // Task untuk mengatur kipas
 
   Serial.println("\n----------------");
   Serial.println("|Pet Smart Home|");
@@ -223,7 +219,7 @@ void setup() {
 }
 
 void loop() {
-  Blynk.run();
-  checkFeedingTime();
-  delay(500);
+  Blynk.run();         // Jalankan Blynk
+  checkFeedingTime();  // Cek waktu makan
+  delay(500);          // Tunda untuk mengurangi beban loop
 }
