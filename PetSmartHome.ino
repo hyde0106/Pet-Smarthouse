@@ -44,6 +44,8 @@ bool rotatingForward = true;
 // Variabel untuk fitur makan
 int feedButtonPressCount = 0; // Jumlah tekanan tombol
 bool isFeedingTime = false;   // Status waktu makan
+bool lastButtonState = false; // Status tombol sebelumnya
+
 
 // RTC untuk waktu makan
 WidgetRTC rtc;
@@ -125,31 +127,35 @@ BLYNK_WRITE(V1) {
 }
 
 // Fungsi untuk memproses tekanan tombol
-BLYNK_WRITE(V2) {
-  int buttonState = param.asInt(); // Baca status tombol dari Blynk
-  Serial.printf("Tombol Feeder ditekan: %d\n", buttonState); // Debugging
-
-  if (buttonState == 1) { // Jika tombol ditekan
-    if (isFeedingTime) { // Periksa apakah sedang waktu makan
-      if (feedButtonPressCount < 5) {
-        feedButtonPressCount++;
-        Serial.printf("Tombol ditekan %d kali\n", feedButtonPressCount);
+  BLYNK_WRITE(V2) {
+  bool buttonState = param.asInt(); // Membaca status tombol (1 = ditekan, 0 = dilepas)
+  
+  // Deteksi perubahan status tombol (dari 0 ke 1)
+  if (buttonState == true && lastButtonState == false) { 
+    if (isFeedingTime) { // Jika ini waktu makan
+      if (feedButtonPressCount < 5) { // Masih dalam batas pencetan
+        feedButtonPressCount++; // Tambah jumlah pencetan
+        Serial.printf("Tombol Feeder ditekan: %d kali\n", feedButtonPressCount);
 
         // Gerakkan servo untuk memberi makan
-        servoMotor.write(90);
+        servoMotor.write(90); // Gerakkan servo ke 90 derajat
         delay(2000);
-        servoMotor.write(0); // Kembalikan posisi servo
+        servoMotor.write(0); // Kembalikan servo ke 0 derajat
 
-        Blynk.virtualWrite(FEED_NOTIFICATION_PIN, String("Makanan diberikan! Sisa pencetan: ") + (5 - feedButtonPressCount));
-      } else {
+        // Notifikasi melalui Blynk
+        int sisaPencetan = 5 - feedButtonPressCount;
+        Blynk.virtualWrite(FEED_NOTIFICATION_PIN, String("Makanan diberikan! Sisa pencetan: ") + sisaPencetan);
+      } else { // Jika mencapai batas pencetan
+        Serial.println("Makanan sudah diberikan 5 kali. Tidak dapat memberi makan lagi!");
         Blynk.virtualWrite(FEED_NOTIFICATION_PIN, "Makanan sudah diberikan 5 kali. Tidak dapat memberi makan lagi!");
-        Serial.println("Notifikasi: Sudah memenuhi batas pemberian makan.");
       }
-    } else {
+    } else { // Jika di luar waktu makan
+      Serial.println("Tidak dalam waktu makan. Tombol ditekan di luar waktu makan.");
       Blynk.virtualWrite(FEED_NOTIFICATION_PIN, "Tidak dalam waktu makan. Tunggu jadwal makan berikutnya!");
-      Serial.println("Notifikasi: Tombol ditekan di luar waktu makan.");
     }
   }
+  // Simpan status tombol untuk iterasi berikutnya
+  lastButtonState = buttonState;
 }
 
 
