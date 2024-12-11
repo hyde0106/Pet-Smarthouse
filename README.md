@@ -167,26 +167,33 @@ Pengujian sistem dilakukan untuk memastikan semua fitur berjalan sesuai dengan d
 **Hasil Uji Sistem di Serial Monitor**
 
 ![Initialization Testing](https://github.com/user-attachments/assets/cc9d4dc0-cbb1-434e-909f-ee1b917c4568)
+
 Koneksi ke WiFi dan Blynk berhasil dilakukan. LED berhasil diinisialisasi dan dalam keadaan mati.
 
 ![DHT Testing](https://github.com/user-attachments/assets/5d1f852f-0516-4064-a237-27b6c8dd5549)
+
 DHT11 berhasil membaca suhu dan kelembaban di lingkungan sekitar hewan peliharaan.
 
 ![LED Testing](https://github.com/user-attachments/assets/7ff1e5ef-9943-4b57-a1e0-e28696d30514)
+
 Photoresistor berhasil membaca intensitas cahaya di lingkungan sekitar hewan peliharaan, mengontrol LED untuk dihidup/matikan, serta mengatur intensitas cahaya LED. 
 
 ![Feed Testing 1](https://github.com/user-attachments/assets/91c34281-7e0a-4de2-8354-3c83eff93658)
+
 Pengingat jadwal makan hewan bekerja dengan baik. Pemilik hewan tidak bisa memberi makan hewan di luar jam makan. 
 
 ![Feed Testing 2](https://github.com/user-attachments/assets/a8c2cb37-5763-49da-91fe-c628398c44fa)
+
 Pemilik hewan bisa memberi makan hewan ketika sudah memasuki jam makan hewan dan memberi makan hewan maksimal lima kali tekan tombol `Feed`.
 
 ![BLE Testing](https://github.com/user-attachments/assets/daea0f8c-c55b-4181-9fe6-c4c20941d4ab)
+
 Lokasi hewan berhasil dilacak dan memberi notifikasi ke pengguna bila hewan berada di luar jangkauan dalam lima menit terakhir. 
 
 **Hasil Uji Sistem di Blynk**
 
 ![Blynk Testing](https://github.com/user-attachments/assets/4c890683-e3c2-4287-a2dd-b2e4a4ca4b97)
+
 Tombol `Feed` dan `LED` bekerja dengan baik untuk memberi makan hewan dan mengatur pencahayaan di kandang hewan. Slider intensitas cahaya berhasil mengatur terang cahaya LED ketika dinyalakan. Display value juga dapat menampilkan data suhu dan kelembaban dengan baik. 
 
 ## Conclusion and Future Work
